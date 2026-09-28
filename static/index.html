@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Secretary Emillia · Local Voice Lab</title>
+    <style>
+      :root { color-scheme: dark; }
+      body { max-width: 760px; margin: 42px auto; padding: 0 20px 48px; background: #10131a; color: #eef2ff; font: 16px system-ui, sans-serif; }
+      h1 { margin-bottom: 6px; } .hint, label small { color: #b9c6e5; }
+      textarea, input, select, button { width: 100%; box-sizing: border-box; border-radius: 10px; padding: 11px; font: inherit; }
+      textarea, input, select { margin-top: 7px; background: #1b2230; color: inherit; border: 1px solid #36445e; }
+      textarea { min-height: 126px; resize: vertical; }
+      label { display: block; font-weight: 650; } label + label { margin-top: 15px; }
+      fieldset { margin: 22px 0; padding: 17px; border: 1px solid #36445e; border-radius: 12px; }
+      legend { padding: 0 7px; color: #d5defa; } .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 15px; }
+      .range-row { display: grid; grid-template-columns: 1fr 60px; align-items: center; gap: 10px; } input[type="range"] { padding: 0; }
+      output { text-align: right; color: #b9c6e5; } button { margin-top: 18px; border: 0; background: #8ba6ff; color: #10131a; font-weight: 750; cursor: pointer; }
+      button:disabled { opacity: .55; cursor: wait; } #status { min-height: 1.5em; color: #b9c6e5; } audio { width: 100%; margin-top: 18px; }
+      @media (max-width: 560px) { .grid { grid-template-columns: 1fr; } }
+    </style>
+  </head>
+  <body>
+    <h1>로컬 음성 실험실</h1>
+    <p class="hint">Qwen3 1.7B가 말투를 만들고, 선택하면 Emilia 또는 Ram RVC가 음색을 입힙니다. 모든 추론은 이 PC에서 실행됩니다.</p>
+    <label>읽을 문장
+      <textarea id="text" maxlength="500">와, 정말이야? 오늘은 왠지 아주 즐거운 일이 생길 것 같아!</textarea>
+    </label>
+    <fieldset>
+      <legend>말투</legend>
+      <label>프리셋
+        <select id="style">
+          <option value="bright">밝고 장난스럽게</option><option value="calm">차분하고 부드럽게</option>
+          <option value="excited">흥분하고 놀라게</option><option value="serious">낮고 진지하게</option><option value="custom">직접 입력</option>
+        </select>
+      </label>
+      <label>말투 지시문 <small>영어 지시가 현재 모델에서 더 일관적입니다.</small>
+        <textarea id="instruct" maxlength="500">Speak as a bright, playful anime character. Use lively pitch variation and clear Korean pronunciation.</textarea>
+      </label>
+    </fieldset>
+    <fieldset>
+      <legend>음색 변환</legend>
+      <div class="grid">
+        <label>캐릭터
+          <select id="voice"><option value="emilia">Emilia</option><option value="ram">Ram</option><option value="base_korean">RVC 없이 Qwen Sohee</option></select>
+        </label>
+        <label>피치 <small>반음</small><div class="range-row"><input id="pitch" type="range" min="-12" max="12" value="0"><output id="pitchOut">0</output></div></label>
+        <label>음색 강도 <small>낮을수록 깨짐 감소</small><div class="range-row"><input id="indexRate" type="range" min="0" max="1" step="0.05" value="0.45"><output id="indexRateOut">0.45</output></div></label>
+        <label>자음 보호 <small>높을수록 발음 보존</small><div class="range-row"><input id="protect" type="range" min="0" max="0.5" step="0.05" value="0.45"><output id="protectOut">0.45</output></div></label>
+      </div>
+      <p class="hint">깨지면 음색 강도를 0.35~0.50으로 낮추고 자음 보호를 0.40~0.50으로 올려 보세요.</p>
+    </fieldset>
+    <button id="run">음성 만들기</button>
+    <p id="status" role="status"></p><audio id="player" controls hidden></audio>
+    <script>
+      const presets = {
+        bright: 'Speak as a bright, playful anime character. Use lively pitch variation and clear Korean pronunciation.',
+        calm: 'Speak in a calm, warm, gentle voice. Keep a smooth rhythm and relaxed pitch.',
+        excited: 'Sound genuinely excited and surprised, with energetic rhythm, vivid emotion, and lively pitch variation.',
+        serious: 'Speak in a low, serious, composed tone. Use deliberate pacing and restrained emotion.'
+      };
+      const button = document.querySelector('#run'), text = document.querySelector('#text'), style = document.querySelector('#style'), instruct = document.querySelector('#instruct'), voice = document.querySelector('#voice'), status = document.querySelector('#status'), player = document.querySelector('#player');
+      [['pitch', 'pitchOut'], ['indexRate', 'indexRateOut'], ['protect', 'protectOut']].forEach(([id, outputId]) => { const control = document.querySelector(`#${id}`), output = document.querySelector(`#${outputId}`); control.addEventListener('input', () => { output.value = control.value; }); });
+      style.addEventListener('change', () => { if (style.value !== 'custom') instruct.value = presets[style.value]; });
+      button.addEventListener('click', async () => {
+        button.disabled = true; player.hidden = true; status.textContent = 'Qwen TTS와 음색 변환을 실행하고 있습니다…';
+        try {
+          const response = await fetch('/api/tts', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ text: text.value, engine: 'qwen3', voice: voice.value, instruct: instruct.value, rvc_pitch: Number(document.querySelector('#pitch').value), rvc_index_rate: Number(document.querySelector('#indexRate').value), rvc_protect: Number(document.querySelector('#protect').value) }) });
+          const data = await response.json(); if (!response.ok) throw new Error(data.detail || '요청 실패');
+          player.src = `${data.audio_url}?v=${data.audio_id}`; player.hidden = false; await player.play(); status.textContent = `완료: ${data.duration_seconds}초 WAV · ${data.voice}`;
+        } catch (error) { status.textContent = `실패: ${error.message}`; } finally { button.disabled = false; }
+      });
+    </script>
+  </body>
+</html>
