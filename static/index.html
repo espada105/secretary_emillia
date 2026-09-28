@@ -17,12 +17,14 @@
       .range-row { display: grid; grid-template-columns: 1fr 60px; align-items: center; gap: 10px; } input[type="range"] { padding: 0; }
       output { text-align: right; color: #b9c6e5; } button { margin-top: 18px; border: 0; background: #8ba6ff; color: #10131a; font-weight: 750; cursor: pointer; }
       button:disabled { opacity: .55; cursor: wait; } #status { min-height: 1.5em; color: #b9c6e5; } audio { width: 100%; margin-top: 18px; }
+      .warning { padding: 12px; border: 1px solid #d6a864; border-radius: 10px; background: #2c251b; color: #ffe2aa; }
       @media (max-width: 560px) { .grid { grid-template-columns: 1fr; } }
     </style>
   </head>
   <body>
     <h1>로컬 음성 실험실</h1>
     <p class="hint">Qwen3 1.7B가 말투를 만들고, 선택하면 Emilia 또는 Ram RVC가 음색을 입힙니다. 모든 추론은 이 PC에서 실행됩니다.</p>
+    <p id="serverNotice" class="warning" hidden>이 파일을 직접 열면 음성 API를 호출할 수 없습니다. <a href="http://127.0.0.1:8000/">http://127.0.0.1:8000/</a>에서 열어 주세요.</p>
     <label>읽을 문장
       <textarea id="text" maxlength="500">와, 정말이야? 오늘은 왠지 아주 즐거운 일이 생길 것 같아!</textarea>
     </label>
@@ -60,6 +62,10 @@
         serious: 'Speak in a low, serious, composed tone. Use deliberate pacing and restrained emotion.'
       };
       const button = document.querySelector('#run'), text = document.querySelector('#text'), style = document.querySelector('#style'), instruct = document.querySelector('#instruct'), voice = document.querySelector('#voice'), status = document.querySelector('#status'), player = document.querySelector('#player');
+      if (location.protocol === 'file:') {
+        document.querySelector('#serverNotice').hidden = false;
+        button.disabled = true;
+      }
       [['pitch', 'pitchOut'], ['indexRate', 'indexRateOut'], ['protect', 'protectOut']].forEach(([id, outputId]) => { const control = document.querySelector(`#${id}`), output = document.querySelector(`#${outputId}`); control.addEventListener('input', () => { output.value = control.value; }); });
       style.addEventListener('change', () => { if (style.value !== 'custom') instruct.value = presets[style.value]; });
       button.addEventListener('click', async () => {
