@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from pathlib import Path
+import re
+import wave
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, HTMLResponse
@@ -38,6 +41,16 @@ class TTSResponse(BaseModel):
     audio_url: str
     duration_seconds: float
     voice: VoiceName
+
+
+class AudioHistoryItem(BaseModel):
+    audio_id: str
+    audio_url: str
+    duration_seconds: float
+    created_at: datetime
+
+
+SAFE_AUDIO_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]*")
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -81,9 +94,34 @@ def synthesize(request: TTSRequest) -> TTSResponse:
     )
 
 
+@app.get("/api/audio", response_model=list[AudioHistoryItem])
+def audio_history() -> list[AudioHistoryItem]:
+    output_dir = settings.secretary_output_dir
+    if not output_dir.is_dir():
+        return []
+    history: list[AudioHistoryItem] = []
+    for path in sorted(output_dir.glob("*.wav"), key=lambda item: item.stat().st_mtime, reverse=True):
+        if not SAFE_AUDIO_ID.fullmatch(path.stem):
+            continue
+        try:
+            with wave.open(str(path), "rb") as audio:
+                duration = audio.getnframes() / audio.getframerate()
+        except (EOFError, wave.Error):
+            continue
+        history.append(
+            AudioHistoryItem(
+                audio_id=path.stem,
+                audio_url=f"/api/audio/{path.stem}",
+                duration_seconds=round(duration, 2),
+                created_at=datetime.fromtimestamp(path.stat().st_mtime, tz=UTC),
+            )
+        )
+    return history[:50]
+
+
 @app.get("/api/audio/{audio_id}")
 def audio(audio_id: str) -> FileResponse:
-    if not audio_id.isalnum():
+    if not SAFE_AUDIO_ID.fullmatch(audio_id):
         raise HTTPException(status_code=404, detail="오디오를 찾을 수 없습니다.")
     path = settings.secretary_output_dir / f"{audio_id}.wav"
     if not path.is_file():
