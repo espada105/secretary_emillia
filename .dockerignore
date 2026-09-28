@@ -1,0 +1,11 @@
+.git
+.venv
+.uv
+vendor
+data
+output
+temp
+.env
+__pycache__
+*.py[cod]
+

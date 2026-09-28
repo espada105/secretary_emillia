@@ -1,0 +1,2 @@
+"""Local personal assistant package."""
+

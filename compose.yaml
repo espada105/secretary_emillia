@@ -1,0 +1,15 @@
+services:
+  tts-test:
+    build: .
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      SECRETARY_OUTPUT_DIR: /app/data/output
+      HF_HOME: /app/data/cache/huggingface
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - ./data:/app/data
+    restart: "no"
+
