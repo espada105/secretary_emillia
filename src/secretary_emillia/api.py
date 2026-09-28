@@ -41,6 +41,7 @@ class TTSResponse(BaseModel):
     audio_url: str
     duration_seconds: float
     voice: VoiceName
+    title: str
 
 
 class AudioHistoryItem(BaseModel):
@@ -48,9 +49,26 @@ class AudioHistoryItem(BaseModel):
     audio_url: str
     duration_seconds: float
     created_at: datetime
+    title: str
 
 
-SAFE_AUDIO_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]*")
+SAFE_AUDIO_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.+-]*")
+TITLED_AUDIO_ID = re.compile(
+    r"(?P<voice>[a-z_]+)-pitch(?P<pitch>[+-]\d+)-strength(?P<strength>\d\.\d{2})"
+    r"-protect(?P<protect>\d\.\d{2})-\d{8}-\d{6}-[0-9a-f]{8}"
+)
+
+
+def audio_title(audio_id: str) -> str:
+    match = TITLED_AUDIO_ID.fullmatch(audio_id)
+    if match is None:
+        return audio_id
+    values = match.groupdict()
+    voice = values["voice"].replace("_", " ").title()
+    return (
+        f"{voice} · 피치 {values['pitch']} · 음색 강도 {values['strength']}"
+        f" · 자음 보호 {values['protect']}"
+    )
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -91,6 +109,7 @@ def synthesize(request: TTSRequest) -> TTSResponse:
         audio_url=f"/api/audio/{audio_id}",
         duration_seconds=round(duration, 2),
         voice=request.voice,
+        title=audio_title(audio_id),
     )
 
 
@@ -114,6 +133,7 @@ def audio_history() -> list[AudioHistoryItem]:
                 audio_url=f"/api/audio/{path.stem}",
                 duration_seconds=round(duration, 2),
                 created_at=datetime.fromtimestamp(path.stat().st_mtime, tz=UTC),
+                title=audio_title(path.stem),
             )
         )
     return history[:50]

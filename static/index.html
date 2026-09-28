@@ -83,7 +83,7 @@
         if (!items.length) { history.add(new Option('아직 생성한 음성이 없습니다.', '')); return; }
         items.forEach((item) => {
           const stamp = new Date(item.created_at).toLocaleString('ko-KR');
-          history.add(new Option(`${item.audio_id} · ${item.duration_seconds}초 · ${stamp}`, item.audio_url, false, item.audio_id === selectedId));
+          history.add(new Option(`${item.title} · ${item.duration_seconds}초 · ${stamp}`, item.audio_url, false, item.audio_id === selectedId));
         });
       };
       playHistory.addEventListener('click', async () => { if (history.value) await play(history.value); });
@@ -93,7 +93,7 @@
         try {
           const response = await fetch('/api/tts', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ text: text.value, engine: 'qwen3', voice: voice.value, instruct: instruct.value, rvc_pitch: Number(document.querySelector('#pitch').value), rvc_index_rate: Number(document.querySelector('#indexRate').value), rvc_protect: Number(document.querySelector('#protect').value) }) });
           const data = await response.json(); if (!response.ok) throw new Error(data.detail || '요청 실패');
-          await play(`${data.audio_url}?v=${data.audio_id}`); await loadHistory(data.audio_id); status.textContent = `완료: ${data.duration_seconds}초 WAV · ${data.voice}`;
+          await play(`${data.audio_url}?v=${data.audio_id}`); await loadHistory(data.audio_id); status.textContent = `완료: ${data.title} · ${data.duration_seconds}초 WAV`;
         } catch (error) { status.textContent = `실패: ${error.message}`; } finally { button.disabled = false; }
       });
     </script>

@@ -4,6 +4,7 @@ import subprocess
 import threading
 import uuid
 import wave
+from datetime import datetime
 from pathlib import Path
 
 from .config import Settings
@@ -84,7 +85,11 @@ class ExpressiveTTS:
 
         output_dir = self._settings.secretary_output_dir
         output_dir.mkdir(parents=True, exist_ok=True)
-        audio_id = uuid.uuid4().hex
+        stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        audio_id = (
+            f"{voice}-pitch{pitch:+d}-strength{index_rate:.2f}-protect{protect:.2f}"
+            f"-{stamp}-{uuid.uuid4().hex[:8]}"
+        )
         source = output_dir / f".{audio_id}.qwen.wav"
         destination = output_dir / f"{audio_id}.wav"
 
