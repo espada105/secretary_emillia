@@ -24,7 +24,7 @@ class TTSRequest(BaseModel):
     text: str = Field(min_length=1, max_length=500)
     engine: TTSEngine = TTSEngine.QWEN3
     voice: VoiceName = VoiceName.EMILIA
-    tone: str = Field(default="custom", min_length=1, max_length=24, pattern=r"[A-Za-z0-9_-]+")
+    tone: str = Field(default="bright", min_length=1, max_length=24, pattern=r"[A-Za-z0-9_-]+")
     instruct: str = Field(
         default=(
             "Speak as a bright, playful anime character. "
@@ -34,7 +34,7 @@ class TTSRequest(BaseModel):
     )
     rvc_index_rate: float = Field(default=0.45, ge=0.0, le=1.0)
     rvc_protect: float = Field(default=0.45, ge=0.0, le=0.5)
-    rvc_pitch: int = Field(default=0, ge=-12, le=12)
+    rvc_pitch: int = Field(default=1, ge=-12, le=12)
 
 
 class TTSResponse(BaseModel):
