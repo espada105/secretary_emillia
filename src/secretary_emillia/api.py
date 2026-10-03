@@ -3,9 +3,11 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from pathlib import Path
 import re
+import uuid
 import wave
 
 from fastapi import FastAPI, HTTPException
+from starlette.background import BackgroundTask
 from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel, Field
 
@@ -94,21 +96,7 @@ def synthesize(request: TTSRequest) -> TTSResponse:
     if not request.speak:
         return TTSResponse(spoken=False)
     try:
-        if request.engine == TTSEngine.MELO:
-            if request.voice != VoiceName.BASE_KOREAN:
-                raise ValueError("Melo 엔진은 기본 한국어 음성만 지원합니다. Qwen3을 선택해 주세요.")
-            audio_id, _path, duration = tts.synthesize(request.text)
-        else:
-            audio_id, _path, duration = expressive_tts.synthesize(
-                text=request.text,
-                engine=request.engine,
-                voice=request.voice,
-                tone=request.tone,
-                instruct=request.instruct,
-                index_rate=request.rvc_index_rate,
-                protect=request.rvc_protect,
-                pitch=request.rvc_pitch,
-            )
+        audio_id, _path, duration = generate_audio(request)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except Exception as exc:
@@ -120,6 +108,45 @@ def synthesize(request: TTSRequest) -> TTSResponse:
         duration_seconds=round(duration, 2),
         voice=request.voice,
         title=audio_title(audio_id),
+    )
+
+
+def generate_audio(request: TTSRequest) -> tuple[str, Path, float]:
+    """Create a WAV. Callers decide whether it belongs in history or is transient."""
+    if request.engine == TTSEngine.MELO:
+        if request.voice != VoiceName.BASE_KOREAN:
+            raise ValueError("Melo 엔진은 기본 한국어 음성만 지원합니다. Qwen3을 선택해 주세요.")
+        return tts.synthesize(request.text)
+    return expressive_tts.synthesize(
+        text=request.text,
+        engine=request.engine,
+        voice=request.voice,
+        tone=request.tone,
+        instruct=request.instruct,
+        index_rate=request.rvc_index_rate,
+        protect=request.rvc_protect,
+        pitch=request.rvc_pitch,
+    )
+
+
+@app.post("/api/speak", response_class=FileResponse)
+def speak_now(request: TTSRequest) -> FileResponse:
+    """Return one playable WAV and remove it once the browser has received it."""
+    if not request.speak:
+        raise HTTPException(status_code=422, detail="바로 말하기 요청에는 speak=true가 필요합니다.")
+    try:
+        _audio_id, created_path, _duration = generate_audio(request)
+        transient_path = created_path.with_name(f".play-{uuid.uuid4().hex}.wav")
+        created_path.replace(transient_path)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"TTS 생성 실패: {exc}") from exc
+    return FileResponse(
+        transient_path,
+        media_type="audio/wav",
+        filename="secretary-now.wav",
+        background=BackgroundTask(transient_path.unlink, missing_ok=True),
     )
 
 
