@@ -1,6 +1,7 @@
 .venv/
 .rvc-venv/
 .rvc-wsl-venv/
+.rvc-gpu-wsl-venv/
 .qwen-wsl-venv/
 *.egg-info/
 vendor/
