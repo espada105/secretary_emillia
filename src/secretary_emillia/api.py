@@ -54,7 +54,7 @@ class AudioHistoryItem(BaseModel):
 
 SAFE_AUDIO_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.+-]*")
 TITLED_AUDIO_ID = re.compile(
-    r"(?P<voice>[a-z_]+)-pitch(?P<pitch>[+-]\d+)-strength(?P<strength>\d\.\d{2})"
+    r"(?:(?P<engine>qwen3(?:_korean)?)-)?(?P<voice>[a-z_]+)-pitch(?P<pitch>[+-]\d+)-strength(?P<strength>\d\.\d{2})"
     r"-protect(?P<protect>\d\.\d{2})-\d{8}-\d{6}-[0-9a-f]{8}"
 )
 
@@ -65,8 +65,9 @@ def audio_title(audio_id: str) -> str:
         return audio_id
     values = match.groupdict()
     voice = values["voice"].replace("_", " ").title()
+    engine = {"qwen3": "Qwen3 1.7B", "qwen3_korean": "Qwen3 0.6B Korean"}.get(values["engine"], "Qwen")
     return (
-        f"{voice} · 피치 {values['pitch']} · 음색 강도 {values['strength']}"
+        f"{engine} · {voice} · 피치 {values['pitch']} · 음색 강도 {values['strength']}"
         f" · 자음 보호 {values['protect']}"
     )
 
@@ -94,6 +95,7 @@ def synthesize(request: TTSRequest) -> TTSResponse:
         else:
             audio_id, _path, duration = expressive_tts.synthesize(
                 text=request.text,
+                engine=request.engine,
                 voice=request.voice,
                 instruct=request.instruct,
                 index_rate=request.rvc_index_rate,

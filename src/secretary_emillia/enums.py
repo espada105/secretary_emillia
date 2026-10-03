@@ -24,6 +24,7 @@ class VoiceName(StrEnum):
 class TTSEngine(StrEnum):
     MELO = "melo"
     QWEN3 = "qwen3"
+    QWEN3_KOREAN = "qwen3_korean"
 
 
 class EnvKey(StrEnum):

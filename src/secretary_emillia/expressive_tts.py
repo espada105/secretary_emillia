@@ -8,12 +8,17 @@ from datetime import datetime
 from pathlib import Path
 
 from .config import Settings
-from .enums import VoiceName
+from .enums import TTSEngine, VoiceName
 
 
 RVC_MODELS: dict[VoiceName, tuple[str, str]] = {
     VoiceName.EMILIA: ("Emilia.pth", "Emilia_v2.index"),
     VoiceName.RAM: ("Ram.pth", "Ram_v2.index"),
+}
+
+QWEN_MODELS: dict[TTSEngine, tuple[str, str, bool]] = {
+    TTSEngine.QWEN3: ("Qwen3-TTS-12Hz-1.7B-CustomVoice", "Sohee", True),
+    TTSEngine.QWEN3_KOREAN: ("Qwen3-TTS-12Hz-0.6B-Korean", "korean_tts", False),
 }
 
 
@@ -69,6 +74,7 @@ class ExpressiveTTS:
         self,
         *,
         text: str,
+        engine: TTSEngine,
         voice: VoiceName,
         instruct: str,
         index_rate: float,
@@ -80,6 +86,8 @@ class ExpressiveTTS:
             raise ValueError("텍스트를 입력해 주세요.")
         if len(normalized) > 500:
             raise ValueError("테스트 입력은 500자 이하로 제한됩니다.")
+        if engine not in QWEN_MODELS:
+            raise ValueError(f"지원하지 않는 Qwen 엔진입니다: {engine}")
         if voice not in {VoiceName.BASE_KOREAN, *RVC_MODELS}:
             raise ValueError(f"아직 준비되지 않은 음성입니다: {voice}")
 
@@ -87,11 +95,12 @@ class ExpressiveTTS:
         output_dir.mkdir(parents=True, exist_ok=True)
         stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
         audio_id = (
-            f"{voice}-pitch{pitch:+d}-strength{index_rate:.2f}-protect{protect:.2f}"
+            f"{engine}-{voice}-pitch{pitch:+d}-strength{index_rate:.2f}-protect{protect:.2f}"
             f"-{stamp}-{uuid.uuid4().hex[:8]}"
         )
         source = output_dir / f".{audio_id}.qwen.wav"
         destination = output_dir / f"{audio_id}.wav"
+        model_directory, speaker, supports_instruct = QWEN_MODELS[engine]
 
         with self._lock:
             self._run_wsl(
@@ -99,9 +108,13 @@ class ExpressiveTTS:
                 "--text",
                 normalized,
                 "--instruct",
-                instruct,
+                instruct if supports_instruct else "",
                 "--output",
                 self._to_wsl_path(source),
+                "--model",
+                self._to_wsl_path(self._project_root / "data" / "models" / model_directory),
+                "--speaker",
+                speaker,
             )
             if voice == VoiceName.BASE_KOREAN:
                 source.replace(destination)

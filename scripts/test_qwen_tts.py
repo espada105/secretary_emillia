@@ -10,8 +10,7 @@ from qwen_tts import Qwen3TTSModel
 
 
 ROOT = Path(__file__).resolve().parents[1]
-MODEL_PATH = ROOT / "data" / "models" / "Qwen3-TTS-12Hz-1.7B-CustomVoice"
-OUTPUT_PATH = ROOT / "data" / "output" / "qwen-sohee-expressive.wav"
+DEFAULT_MODEL_PATH = ROOT / "data" / "models" / "Qwen3-TTS-12Hz-1.7B-CustomVoice"
 
 
 def main() -> None:
@@ -19,6 +18,8 @@ def main() -> None:
     parser.add_argument("--text", required=True)
     parser.add_argument("--instruct", default="")
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--model", type=Path, default=DEFAULT_MODEL_PATH)
+    parser.add_argument("--speaker", default="Sohee")
     args = parser.parse_args()
     if not torch.cuda.is_available():
         raise RuntimeError("CUDA GPU를 찾지 못했습니다.")
@@ -27,18 +28,16 @@ def main() -> None:
     torch.cuda.reset_peak_memory_stats()
     started_at = time.perf_counter()
     model = Qwen3TTSModel.from_pretrained(
-        str(MODEL_PATH),
+        str(args.model),
         device_map="cuda:0",
         dtype=torch.bfloat16,
         attn_implementation="sdpa",
     )
     loaded_at = time.perf_counter()
-    wavs, sample_rate = model.generate_custom_voice(
-        text=args.text,
-        language="Korean",
-        speaker="Sohee",
-        instruct=args.instruct,
-    )
+    generate_args = {"text": args.text, "language": "Korean", "speaker": args.speaker}
+    if args.instruct:
+        generate_args["instruct"] = args.instruct
+    wavs, sample_rate = model.generate_custom_voice(**generate_args)
     sf.write(args.output, wavs[0], sample_rate)
     completed_at = time.perf_counter()
     peak_mib = torch.cuda.max_memory_allocated() / 1024 / 1024
