@@ -73,6 +73,24 @@ class ExpressiveTTS:
             # Qwen/Torch warnings are normal, but preserve actionable errors.
             print(completed.stderr)
 
+    @staticmethod
+    def _pad_short_rvc_input(source: Path, minimum_seconds: float = 4.0) -> Path:
+        """RVC needs a few seconds of context; preserve terse assistant replies."""
+        with wave.open(str(source), "rb") as audio:
+            parameters = audio.getparams()
+            frames = audio.readframes(audio.getnframes())
+        duration = parameters.nframes / parameters.framerate
+        if duration >= minimum_seconds:
+            return source
+
+        padded = source.with_name(f"{source.stem}.padded.wav")
+        remaining_frames = int((minimum_seconds - duration) * parameters.framerate)
+        silence = b"\x00" * remaining_frames * parameters.nchannels * parameters.sampwidth
+        with wave.open(str(padded), "wb") as audio:
+            audio.setparams(parameters)
+            audio.writeframes(frames + silence)
+        return padded
+
     def synthesize(
         self,
         *,
@@ -119,26 +137,31 @@ class ExpressiveTTS:
                 source.replace(destination)
             else:
                 model_name, index_name = RVC_MODELS[voice]
-                self._run_wsl(
-                    "run_rvc_wsl.sh",
-                    "--model",
-                    self._to_wsl_path(self._project_root / "models" / "rezero-lim" / "extracted" / model_name),
-                    "--input",
-                    self._to_wsl_path(source),
-                    "--output",
-                    self._to_wsl_path(destination),
-                    "--index",
-                    self._to_wsl_path(
-                        self._project_root / "models" / "rezero-lim" / "extracted" / "Index" / index_name
-                    ),
-                    "--index-rate",
-                    str(index_rate),
-                    "--protect",
-                    str(protect),
-                    "--pitch",
-                    str(pitch),
-                )
-                source.unlink(missing_ok=True)
+                rvc_input = self._pad_short_rvc_input(source)
+                try:
+                    self._run_wsl(
+                        "run_rvc_wsl.sh",
+                        "--model",
+                        self._to_wsl_path(self._project_root / "models" / "rezero-lim" / "extracted" / model_name),
+                        "--input",
+                        self._to_wsl_path(rvc_input),
+                        "--output",
+                        self._to_wsl_path(destination),
+                        "--index",
+                        self._to_wsl_path(
+                            self._project_root / "models" / "rezero-lim" / "extracted" / "Index" / index_name
+                        ),
+                        "--index-rate",
+                        str(index_rate),
+                        "--protect",
+                        str(protect),
+                        "--pitch",
+                        str(pitch),
+                    )
+                finally:
+                    if rvc_input != source:
+                        rvc_input.unlink(missing_ok=True)
+                    source.unlink(missing_ok=True)
 
         try:
             with wave.open(str(destination), "rb") as audio:
@@ -152,3 +175,7 @@ class ExpressiveTTS:
 
     def shutdown(self) -> None:
         self._qwen_worker.shutdown()
+
+    def warmup_default_model(self) -> None:
+        model_directory, _speaker, _supports_instruct = QWEN_MODELS[TTSEngine.QWEN3]
+        self._qwen_worker.warmup(model=self._project_root / "data" / "models" / model_directory)

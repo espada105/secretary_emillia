@@ -155,6 +155,12 @@ def shutdown_voice_workers() -> None:
     expressive_tts.shutdown()
 
 
+@app.on_event("startup")
+def warmup_default_voice_model() -> None:
+    """Only report the server ready after the default assistant voice is warm."""
+    expressive_tts.warmup_default_model()
+
+
 @app.get("/api/audio", response_model=list[AudioHistoryItem])
 def audio_history() -> list[AudioHistoryItem]:
     output_dir = settings.secretary_output_dir

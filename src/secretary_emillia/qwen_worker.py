@@ -67,19 +67,27 @@ class PersistentQwenWorker:
         model: Path,
         speaker: str,
     ) -> None:
-        with self._lock:
-            process = self._start()
-            if process.stdin is None:
-                raise RuntimeError("Qwen 워커의 입력 채널을 열 수 없습니다.")
-            request_id = uuid.uuid4().hex
-            payload = {
-                "id": request_id,
+        self._request(
+            {
                 "text": text,
                 "instruct": instruct,
                 "output": self._to_wsl_path(output),
                 "model": self._to_wsl_path(model),
                 "speaker": speaker,
             }
+        )
+
+    def warmup(self, *, model: Path) -> None:
+        """Load a model before accepting browser requests."""
+        self._request({"command": "warmup", "model": self._to_wsl_path(model)})
+
+    def _request(self, payload: dict[str, object]) -> None:
+        with self._lock:
+            process = self._start()
+            if process.stdin is None:
+                raise RuntimeError("Qwen 워커의 입력 채널을 열 수 없습니다.")
+            request_id = uuid.uuid4().hex
+            payload["id"] = request_id
             process.stdin.write(json.dumps(payload, ensure_ascii=False) + "\n")
             process.stdin.flush()
             try:

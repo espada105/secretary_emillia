@@ -66,4 +66,13 @@ for line in sys.stdin:
         continue
     if request.get("command") == "shutdown":
         break
+    if request.get("command") == "warmup":
+        request_id = str(request.get("id", ""))
+        try:
+            with contextlib.redirect_stdout(sys.stderr):
+                get_model(str(request["model"]))
+            emit({"id": request_id, "ok": True})
+        except Exception:
+            emit({"id": request_id, "ok": False, "error": traceback.format_exc(limit=3)[-1600:]})
+        continue
     generate(request)
