@@ -24,6 +24,7 @@ class TTSRequest(BaseModel):
     text: str = Field(min_length=1, max_length=500)
     engine: TTSEngine = TTSEngine.QWEN3
     voice: VoiceName = VoiceName.EMILIA
+    tone: str = Field(default="custom", min_length=1, max_length=24, pattern=r"[A-Za-z0-9_-]+")
     instruct: str = Field(
         default=(
             "Speak as a bright, playful anime character. "
@@ -54,7 +55,7 @@ class AudioHistoryItem(BaseModel):
 
 SAFE_AUDIO_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.+-]*")
 TITLED_AUDIO_ID = re.compile(
-    r"(?:(?P<engine>qwen3(?:_korean)?)-)?(?P<voice>[a-z_]+)-pitch(?P<pitch>[+-]\d+)-strength(?P<strength>\d\.\d{2})"
+    r"(?:(?P<engine>qwen3(?:_korean)?)-)?(?P<voice>[a-z_]+)(?:-tone(?P<tone>[a-z0-9_-]+))?-pitch(?P<pitch>[+-]\d+)-strength(?P<strength>\d\.\d{2})"
     r"-protect(?P<protect>\d\.\d{2})-\d{8}-\d{6}-[0-9a-f]{8}"
 )
 
@@ -66,8 +67,9 @@ def audio_title(audio_id: str) -> str:
     values = match.groupdict()
     voice = values["voice"].replace("_", " ").title()
     engine = {"qwen3": "Qwen3 1.7B", "qwen3_korean": "Qwen3 0.6B Korean"}.get(values["engine"], "Qwen")
+    tone = {"bright": "밝음", "calm": "차분함", "excited": "흥분", "serious": "진지함", "natural": "기본", "custom": "직접 지시"}.get(values["tone"], values["tone"] or "미지정")
     return (
-        f"{engine} · {voice} · 피치 {values['pitch']} · 음색 강도 {values['strength']}"
+        f"{engine} · {voice} · 톤 {tone} · 피치 {values['pitch']} · 음색 강도 {values['strength']}"
         f" · 자음 보호 {values['protect']}"
     )
 
@@ -97,6 +99,7 @@ def synthesize(request: TTSRequest) -> TTSResponse:
                 text=request.text,
                 engine=request.engine,
                 voice=request.voice,
+                tone=request.tone,
                 instruct=request.instruct,
                 index_rate=request.rvc_index_rate,
                 protect=request.rvc_protect,

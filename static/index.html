@@ -103,7 +103,7 @@
       button.addEventListener('click', async () => {
         button.disabled = true; player.hidden = true; status.textContent = 'Qwen TTS와 음색 변환을 실행하고 있습니다…';
         try {
-          const response = await fetch('/api/tts', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ text: text.value, engine: engine.value, voice: voice.value, instruct: instruct.value, rvc_pitch: Number(document.querySelector('#pitch').value), rvc_index_rate: Number(document.querySelector('#indexRate').value), rvc_protect: Number(document.querySelector('#protect').value) }) });
+          const response = await fetch('/api/tts', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ text: text.value, engine: engine.value, voice: voice.value, tone: engine.value === 'qwen3' ? style.value : 'natural', instruct: instruct.value, rvc_pitch: Number(document.querySelector('#pitch').value), rvc_index_rate: Number(document.querySelector('#indexRate').value), rvc_protect: Number(document.querySelector('#protect').value) }) });
           const data = await response.json(); if (!response.ok) throw new Error(data.detail || '요청 실패');
           await play(`${data.audio_url}?v=${data.audio_id}`); await loadHistory(data.audio_id); status.textContent = `완료: ${data.title} · ${data.duration_seconds}초 WAV`;
         } catch (error) { status.textContent = `실패: ${error.message}`; } finally { button.disabled = false; }

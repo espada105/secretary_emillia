@@ -5,6 +5,7 @@ import threading
 import uuid
 import wave
 from datetime import datetime
+import re
 from pathlib import Path
 
 from .config import Settings
@@ -76,6 +77,7 @@ class ExpressiveTTS:
         text: str,
         engine: TTSEngine,
         voice: VoiceName,
+        tone: str,
         instruct: str,
         index_rate: float,
         protect: float,
@@ -86,6 +88,7 @@ class ExpressiveTTS:
             raise ValueError("텍스트를 입력해 주세요.")
         if len(normalized) > 500:
             raise ValueError("테스트 입력은 500자 이하로 제한됩니다.")
+        normalized_tone = re.sub(r"[^a-z0-9_-]", "", tone.lower())[:24] or "custom"
         if engine not in QWEN_MODELS:
             raise ValueError(f"지원하지 않는 Qwen 엔진입니다: {engine}")
         if voice not in {VoiceName.BASE_KOREAN, *RVC_MODELS}:
@@ -95,7 +98,7 @@ class ExpressiveTTS:
         output_dir.mkdir(parents=True, exist_ok=True)
         stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
         audio_id = (
-            f"{engine}-{voice}-pitch{pitch:+d}-strength{index_rate:.2f}-protect{protect:.2f}"
+            f"{engine}-{voice}-tone{normalized_tone}-pitch{pitch:+d}-strength{index_rate:.2f}-protect{protect:.2f}"
             f"-{stamp}-{uuid.uuid4().hex[:8]}"
         )
         source = output_dir / f".{audio_id}.qwen.wav"
