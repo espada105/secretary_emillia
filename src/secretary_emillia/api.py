@@ -86,8 +86,8 @@ def test_page() -> str:
 @app.get("/api/voices")
 def voices() -> dict[str, list[str]]:
     return {
-        "available": [VoiceName.BASE_KOREAN, *RVC_MODELS],
-        "planned_rvc": [voice for voice in VoiceName if voice not in {VoiceName.BASE_KOREAN, *RVC_MODELS}],
+        "available": [VoiceName.BASE_KOREAN, VoiceName.ONO_ANNA, *RVC_MODELS],
+        "planned_rvc": [voice for voice in VoiceName if voice not in {VoiceName.BASE_KOREAN, VoiceName.ONO_ANNA, *RVC_MODELS}],
     }
 
 

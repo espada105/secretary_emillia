@@ -13,6 +13,7 @@ class ToolName(StrEnum):
 
 class VoiceName(StrEnum):
     BASE_KOREAN = "base_korean"
+    ONO_ANNA = "ono_anna"
     EMILIA = "emilia"
     RAM = "ram"
     BEATRICE = "beatrice"

@@ -18,9 +18,19 @@ RVC_MODELS: dict[VoiceName, tuple[str, str]] = {
     VoiceName.RAM: ("Ram.pth", "Ram_v2.index"),
 }
 
-QWEN_MODELS: dict[TTSEngine, tuple[str, str, bool]] = {
-    TTSEngine.QWEN3: ("Qwen3-TTS-12Hz-1.7B-CustomVoice", "Sohee", True),
-    TTSEngine.QWEN3_KOREAN: ("Qwen3-TTS-12Hz-0.6B-Korean", "korean_tts", False),
+QWEN_MODELS: dict[TTSEngine, tuple[str, bool]] = {
+    TTSEngine.QWEN3: ("Qwen3-TTS-12Hz-1.7B-CustomVoice", True),
+    TTSEngine.QWEN3_KOREAN: ("Qwen3-TTS-12Hz-0.6B-Korean", False),
+}
+
+NATIVE_QWEN_SPEAKERS: dict[TTSEngine, dict[VoiceName, str]] = {
+    TTSEngine.QWEN3: {
+        VoiceName.BASE_KOREAN: "Sohee",
+        VoiceName.ONO_ANNA: "Ono_Anna",
+    },
+    TTSEngine.QWEN3_KOREAN: {
+        VoiceName.BASE_KOREAN: "korean_tts",
+    },
 }
 
 
@@ -111,8 +121,11 @@ class ExpressiveTTS:
         normalized_tone = re.sub(r"[^a-z0-9_-]", "", tone.lower())[:24] or "custom"
         if engine not in QWEN_MODELS:
             raise ValueError(f"지원하지 않는 Qwen 엔진입니다: {engine}")
-        if voice not in {VoiceName.BASE_KOREAN, *RVC_MODELS}:
+        native_speakers = NATIVE_QWEN_SPEAKERS[engine]
+        if voice not in {*native_speakers, *RVC_MODELS}:
             raise ValueError(f"아직 준비되지 않은 음성입니다: {voice}")
+        if voice == VoiceName.ONO_ANNA and engine != TTSEngine.QWEN3:
+            raise ValueError("Ono_Anna는 Qwen3 1.7B CustomVoice 엔진에서만 사용할 수 있습니다.")
 
         output_dir = self._settings.secretary_output_dir
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -123,7 +136,8 @@ class ExpressiveTTS:
         )
         source = output_dir / f".{audio_id}.qwen.wav"
         destination = output_dir / f"{audio_id}.wav"
-        model_directory, speaker, supports_instruct = QWEN_MODELS[engine]
+        model_directory, supports_instruct = QWEN_MODELS[engine]
+        speaker = native_speakers.get(voice, native_speakers[VoiceName.BASE_KOREAN])
 
         with self._lock:
             self._qwen_worker.generate(
@@ -133,7 +147,7 @@ class ExpressiveTTS:
                 model=self._project_root / "data" / "models" / model_directory,
                 speaker=speaker,
             )
-            if voice == VoiceName.BASE_KOREAN:
+            if voice in native_speakers:
                 source.replace(destination)
             else:
                 model_name, index_name = RVC_MODELS[voice]
@@ -177,5 +191,5 @@ class ExpressiveTTS:
         self._qwen_worker.shutdown()
 
     def warmup_default_model(self) -> None:
-        model_directory, _speaker, _supports_instruct = QWEN_MODELS[TTSEngine.QWEN3]
+        model_directory, _supports_instruct = QWEN_MODELS[TTSEngine.QWEN3]
         self._qwen_worker.warmup(model=self._project_root / "data" / "models" / model_directory)
