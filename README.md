@@ -28,6 +28,10 @@ Qwen/RVC는 Windows 네이티브 패키지 충돌을 피하기 위해 WSL의 별
 - `.rvc-wsl-venv/`: RVC 추론 런타임
 - `models/rezero-lim/extracted/`: Emilia/Ram `.pth`와 `.index` 파일
 
+Qwen 워커는 FastAPI가 살아 있는 동안 마지막으로 사용한 Qwen 모델을 GPU에 유지합니다. 따라서 첫 생성 또는 엔진 변경 때만 모델 로딩 시간이 들고, 같은 엔진을 연속으로 쓰는 요청은 바로 추론을 시작합니다. RVC는 현재 요청마다 CPU 추론을 실행하므로 Emilia/Ram 경로의 남은 지연 시간은 별도로 존재합니다.
+
+`POST /api/tts`에는 `speak` 불리언이 있습니다. `true`면 WAV를 생성하고, `false`면 음성을 만들지 않고 `{"spoken": false}`를 반환합니다. 이후 음성 입력 명령이나 에이전트 응답에서, 응답을 읽을지 여부를 이 값으로 제어할 수 있습니다.
+
 `base_korean`을 선택하면 RVC 없이 Qwen의 한국어 기본 화자 Sohee를 사용합니다. MeloTTS는 API 호환성 확인을 위한 `melo` 엔진으로 남아 있으며, 현재 UI의 기본 경로는 아닙니다.
 
 Docker Compose는 기본 FastAPI/MeloTTS 환경을 고정합니다. Qwen/RVC까지 컨테이너에서 사용하려면 GPU 지원 Docker 및 모델 볼륨을 별도로 구성해야 하므로, 현재 검증된 경로는 Windows 호스트 FastAPI + WSL 추론입니다.

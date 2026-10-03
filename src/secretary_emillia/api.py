@@ -32,17 +32,19 @@ class TTSRequest(BaseModel):
         ),
         max_length=500,
     )
-    rvc_index_rate: float = Field(default=0.45, ge=0.0, le=1.0)
+    rvc_index_rate: float = Field(default=0.40, ge=0.0, le=1.0)
     rvc_protect: float = Field(default=0.45, ge=0.0, le=0.5)
     rvc_pitch: int = Field(default=1, ge=-12, le=12)
+    speak: bool = True
 
 
 class TTSResponse(BaseModel):
-    audio_id: str
-    audio_url: str
-    duration_seconds: float
-    voice: VoiceName
-    title: str
+    spoken: bool
+    audio_id: str | None = None
+    audio_url: str | None = None
+    duration_seconds: float | None = None
+    voice: VoiceName | None = None
+    title: str | None = None
 
 
 class AudioHistoryItem(BaseModel):
@@ -89,6 +91,8 @@ def voices() -> dict[str, list[str]]:
 
 @app.post("/api/tts", response_model=TTSResponse)
 def synthesize(request: TTSRequest) -> TTSResponse:
+    if not request.speak:
+        return TTSResponse(spoken=False)
     try:
         if request.engine == TTSEngine.MELO:
             if request.voice != VoiceName.BASE_KOREAN:
@@ -110,12 +114,18 @@ def synthesize(request: TTSRequest) -> TTSResponse:
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"TTS 생성 실패: {exc}") from exc
     return TTSResponse(
+        spoken=True,
         audio_id=audio_id,
         audio_url=f"/api/audio/{audio_id}",
         duration_seconds=round(duration, 2),
         voice=request.voice,
         title=audio_title(audio_id),
     )
+
+
+@app.on_event("shutdown")
+def shutdown_voice_workers() -> None:
+    expressive_tts.shutdown()
 
 
 @app.get("/api/audio", response_model=list[AudioHistoryItem])

@@ -10,6 +10,7 @@ from pathlib import Path
 
 from .config import Settings
 from .enums import TTSEngine, VoiceName
+from .qwen_worker import PersistentQwenWorker
 
 
 RVC_MODELS: dict[VoiceName, tuple[str, str]] = {
@@ -30,6 +31,7 @@ class ExpressiveTTS:
         self._settings = settings
         self._project_root = Path(__file__).resolve().parents[2]
         self._lock = threading.Lock()
+        self._qwen_worker = PersistentQwenWorker(settings, self._project_root)
 
     @staticmethod
     def _to_wsl_path(path: Path) -> str:
@@ -106,18 +108,12 @@ class ExpressiveTTS:
         model_directory, speaker, supports_instruct = QWEN_MODELS[engine]
 
         with self._lock:
-            self._run_wsl(
-                "run_qwen_tts_wsl.sh",
-                "--text",
-                normalized,
-                "--instruct",
-                instruct if supports_instruct else "",
-                "--output",
-                self._to_wsl_path(source),
-                "--model",
-                self._to_wsl_path(self._project_root / "data" / "models" / model_directory),
-                "--speaker",
-                speaker,
+            self._qwen_worker.generate(
+                text=normalized,
+                instruct=instruct if supports_instruct else "",
+                output=source,
+                model=self._project_root / "data" / "models" / model_directory,
+                speaker=speaker,
             )
             if voice == VoiceName.BASE_KOREAN:
                 source.replace(destination)
@@ -153,3 +149,6 @@ class ExpressiveTTS:
             destination.unlink(missing_ok=True)
             raise
         return audio_id, destination, duration
+
+    def shutdown(self) -> None:
+        self._qwen_worker.shutdown()
